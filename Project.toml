@@ -1,0 +1,13 @@
+name = "ScalarWave3D"
+uuid = "ae0c53cd-8ee1-4e9a-acfb-47eefb3fcea7"
+authors = ["Stamatis Vretinaris"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
