@@ -72,7 +72,6 @@ Time:
     dt:           $(params.dt)
 
 Output:
-    job ID:        $(params.jobid)
     output path:   $simdir
     save every:    $save_every
 \n
@@ -82,5 +81,8 @@ Output:
         write(file, data)
     end
 end
+
+
+#     job ID:        $(params.jobid)
 
 end # end of module

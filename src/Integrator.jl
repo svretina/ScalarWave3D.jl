@@ -1,7 +1,17 @@
 module Integrator
 
+const USE_GPU = false
+
 using ..InputOutput
+using ..Grids
 using LoopVectorization
+using ParallelStencil
+
+@static if USE_GPU
+    @init_parallel_stencil(CUDA, Float64, 3)
+else
+    @init_parallel_stencil(Threads, Float64, 3)
+end
 
 const proj_path = pkgdir(Integrator)
 if occursin("cn", gethostname()) || occursin("mn", gethostname())
@@ -20,24 +30,24 @@ end
 
 @inline function RK4(rhs!::F, dt::Real, reg1, reg2, reg3, reg4, params, t::Real,
                      indices::CartesianIndices) where {F}
-    rhs!(reg4, reg1, params, t)
+    @parallel rhs!(reg4, reg1, params, t)
     @inbounds @fastmath @avx for i in indices
         reg3[i] = dt * reg4[i]
         reg1[i] = reg1[i] + reg3[i] / 2
         reg2[i] = reg3[i]
     end
-    rhs!(reg4, reg1, params, t)
+    @parallel rhs!(reg4, reg1, params, t)
     @inbounds @fastmath @avx for i in indices
         reg3[i] = dt * reg4[i]
         reg1[i] = reg1[i] + (reg3[i] - reg2[i]) / 2
     end
-    rhs!(reg4, reg1, params, t)
+    @parallel rhs!(reg4, reg1, params, t)
     @inbounds @fastmath @avx for i in indices
         reg3[i] = dt * reg4[i] - reg3[i] / 2
         reg1[i] = reg1[i] + reg3[i]
         reg2[i] = reg2[i] / 6 - reg3[i]
     end
-    rhs!(reg4, reg1, params, t)
+    @parallel rhs!(reg4, reg1, params, t)
     @inbounds @fastmath @avx for i in indices
         reg3[i] = dt * reg4[i] + reg3[i] + reg3[i]
         reg1[i] = reg1[i] + reg2[i] + reg3[i] / 6
@@ -46,12 +56,12 @@ end
 end
 
 function solve(rhs, statevector, params, t, grid, save_every, folder)
-    istr = get_iter_str(0, t.ncells + 1)
+    # istr = get_iter_str(0, t.ncells + 1)
     base_dir = base_path(folder)
     sims_dir = sims_path(folder)
     base_str = string(sims_dir, "output_L=", Int64(grid.domain[2]), "_nc=",
-                      grid.ncells, "_v=", v, "_")
-    dataset = string(base_str, istr, ".h5")
+                      grid.ncells)
+    # dataset = string(base_str, istr, ".h5")
 
     if !isdir(base_dir)
         mkdir(base_dir)
@@ -60,16 +70,15 @@ function solve(rhs, statevector, params, t, grid, save_every, folder)
         mkdir(sims_dir)
     end
 
-    if isfile(dataset)
-        rm(dataset)
-    end
+    # if isfile(dataset)
+    #     rm(dataset)
+    # end
 
     println("Output data at directory: ", sims_dir)
 
     # write initial data
-    xcoord = params.grid_coords
+    xcoord = coords(grid)
     pvd = InputOutput.writevtk_initialdata(statevector, sims_dir, xcoord)
-
 
     println("=========Starting time integration=========")
     print("Allocating registers for time integrator...")
@@ -81,9 +90,9 @@ function solve(rhs, statevector, params, t, grid, save_every, folder)
     println("saving every=", save_every)
 
     nt = t.ncells + 1
-    dt = params.dt
+    dt = spacing(t)
     indices = CartesianIndices(statevector)
-
+    params = (grid=grid, dt=dt, ti=coords(t), params...)
     InputOutput.write_metadata(base_dir, params, save_every, sims_dir)
     for (i, ti) in enumerate(params.ti)
         i -= 1
@@ -100,6 +109,5 @@ function solve(rhs, statevector, params, t, grid, save_every, folder)
     InputOutput.save_pvd(pvd)
     return nothing
 end
-
 
 end # end of module
