@@ -33,7 +33,7 @@ function cartesian3D(L::Real, ncells::Int, tf::Real, cfl::Real;
     statevector = @zeros(N, N, N, 5)
     # Initialize arrays
     sample_statevector!(statevector, coords(grid), params_gaussian, 0.0)
-
+    @show typeof(statevector)
     params = (h=spacing(grid), N=N)
 
     Integrator.solve(ODE.rhs!, statevector, params, t, grid, save_every, res)
